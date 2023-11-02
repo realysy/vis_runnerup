@@ -63,21 +63,30 @@ public class MainActivity extends AppCompatActivity {
                 float distance = cursor.getFloat(cursor.getColumnIndexOrThrow("distance"));
                 long time = cursor.getLong(cursor.getColumnIndexOrThrow("time"));
                 int type = cursor.getInt(cursor.getColumnIndexOrThrow("type"));
-                if (type == 0) {
-                    run_count++;
-                    run_time += time;
-                    run_distance += distance;
-                }
+
+                do {
+                    // 统计跑步
+                    if (type == 0) {
+                        long[] pace = get_pace(distance, time);
+
+                        // 忽略配速太慢的
+                        if (pace[0] > 10) {
+                            break;
+                        }
+
+                        run_count++;
+                        run_time += time;
+                        run_distance += distance;
+                    }
+                } while (false);
+
                 //Log.i("visdebug", "id: " + id + ", start_time: " + startTime + ", distance: " + distance +
                 //        ", time: " + time + ", type: " + type);
             }
 
-            long pace = (long) (run_time / (run_distance/1000));  // sec/km
-            long pace_min = pace / 60; // 计算商
-            long pace_sec = pace % 60; // 计算余数
-
+            long[] pace = get_pace(run_distance, run_time);
             run_info += String.format("总跑步距离 %.2f km, 共跑步 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km",
-                    run_distance/1000, run_count, run_distance/1000/run_count, pace_min,pace_sec);
+                    run_distance/1000, run_count, run_distance/1000/run_count, pace[0],pace[1]);
             Log.i("visdebug", run_info);
 
             // 关闭游标
@@ -93,6 +102,21 @@ public class MainActivity extends AppCompatActivity {
  */
     }
 
+    /**
+     * 计算配速。
+     * @param distance 运动距离 米
+     * @param time 运动时长 秒
+     * @return 返回一个 long[2] 类型的数组，含义为每千米用时 [pace_minute, pace_sec]
+     */
+    public long[] get_pace(float distance, long time) {
+        long[] values = new long[2];
+
+        long pace = (long) (time / (distance/1000));  // sec/km
+        values[0] = pace / 60; // 计算商, min
+        values[1] = pace % 60; // 计算余数, sec
+
+        return values;
+    }
     // 请求应用内存读写权限
     public void requestReadWritePermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
