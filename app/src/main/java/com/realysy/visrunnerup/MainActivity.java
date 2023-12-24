@@ -57,6 +57,12 @@ public class MainActivity extends AppCompatActivity {
             long run_time = 0;  // sec
             float run_distance = 0;
 
+            long start_2023 = 1672502400;
+            long end_2023 = 1704038400;
+            int run_count_2023 = 0;
+            long run_time_2023 = 0;  // sec
+            float run_distance_2023 = 0;
+
             while (cursor.moveToNext()) {
                 int id = cursor.getInt(cursor.getColumnIndexOrThrow("_id"));
                 long startTime = cursor.getLong(cursor.getColumnIndexOrThrow("start_time"));
@@ -74,9 +80,17 @@ public class MainActivity extends AppCompatActivity {
                             break;
                         }
 
+                        // 全部
                         run_count++;
                         run_time += time;
                         run_distance += distance;
+
+                        // 2023
+                        if (startTime >= start_2023 && startTime < end_2023) {
+                            run_count_2023++;
+                            run_time_2023 += time;
+                            run_distance_2023 += distance;
+                        }
                     }
                 } while (false);
 
@@ -84,7 +98,11 @@ public class MainActivity extends AppCompatActivity {
                 //        ", time: " + time + ", type: " + type);
             }
 
-            long[] pace = get_pace(run_distance, run_time);
+            long[] pace = get_pace(run_distance_2023, run_time_2023);
+            run_info += String.format("2023跑步距离 %.2f km, 共跑步 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km\n\n",
+                    run_distance_2023/1000, run_count_2023, run_distance_2023/1000/run_count_2023, pace[0],pace[1]);
+
+            pace = get_pace(run_distance, run_time);
             run_info += String.format("总跑步距离 %.2f km, 共跑步 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km",
                     run_distance/1000, run_count, run_distance/1000/run_count, pace[0],pace[1]);
             Log.i("visdebug", run_info);
