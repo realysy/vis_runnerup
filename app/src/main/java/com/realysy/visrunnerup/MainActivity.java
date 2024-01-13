@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             db = SQLiteDatabase.openDatabase(path_db, null, SQLiteDatabase.OPEN_READONLY);
         } catch (Exception e) {
-            runinfo.setText("Db file not found: " + path_db + ", \n\nwhich can be exported from Runnerup App, and should been put to that path.");
+            runinfo.setText("DB file not found: " + path_db + ", \n\nwhich can be exported from Runnerup App, and should been put to that path.");
             return ;
         }
 
