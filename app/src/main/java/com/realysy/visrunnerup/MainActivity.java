@@ -44,7 +44,14 @@ public class MainActivity extends AppCompatActivity {
         // 读取数据库
         path_db = path_root + "/runnerup.db.export";
         Log.i("visdebug", path_db);
-        SQLiteDatabase db = SQLiteDatabase.openDatabase(path_db, null, SQLiteDatabase.OPEN_READONLY);
+
+        SQLiteDatabase db = null;
+        try {
+            db = SQLiteDatabase.openDatabase(path_db, null, SQLiteDatabase.OPEN_READONLY);
+        } catch (Exception e) {
+            runinfo.setText("Db file not found: " + path_db + ", \n\nwhich can be exported from Runnerup App, and should been put to that path.");
+            return ;
+        }
 
         // 读取表中的字段
         String[] columns = {"_id", "start_time", "distance", "time", "type"};
