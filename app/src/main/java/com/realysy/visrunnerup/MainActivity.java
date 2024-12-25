@@ -68,9 +68,11 @@ public class MainActivity extends AppCompatActivity {
             long start_2023 = 1674144000;
             long end_2023 = 1707494400;
             long end_2024 = 1740758400;
+
             int run_count_2023 = 0;
             long run_time_2023 = 0;  // sec
             float run_distance_2023 = 0;
+
             int run_count_2024 = 0;
             long run_time_2024 = 0;  // sec
             float run_distance_2024 = 0;
@@ -80,15 +82,18 @@ public class MainActivity extends AppCompatActivity {
                 long startTime = cursor.getLong(cursor.getColumnIndexOrThrow("start_time"));
                 float distance = cursor.getFloat(cursor.getColumnIndexOrThrow("distance"));
                 long time = cursor.getLong(cursor.getColumnIndexOrThrow("time"));
+                // type: 0跑步 4行走
                 int type = cursor.getInt(cursor.getColumnIndexOrThrow("type"));
 
                 do {
                     // 统计跑步
-                    if (type == 0) {
+                    if (type == 0 || type == 4) {
                         long[] pace = get_pace(distance, time);
 
-                        // 忽略配速太慢的
-                        if (pace[0] > 10) {
+                        // 忽略配速太慢 && 距离太短的
+                        if (type == 0 && pace[0] > 11 && distance < 2000) {
+                            break;
+                        } else if (type == 4 && pace[0] > 15 && distance < 3000) {
                             break;
                         }
 
@@ -116,22 +121,24 @@ public class MainActivity extends AppCompatActivity {
                 //        ", time: " + time + ", type: " + type);
             }
 
+            // 这里把跑步和行走合并计算配速，也许不好
             long[] pace = get_pace(run_distance_2023, run_time_2023);
-            run_info += String.format("2023跑步距离 %.2f km, 共跑步 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km\n\n",
+            run_info += String.format("2023运动距离 %.2f km, 共 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km\n\n",
                     run_distance_2023/1000, run_count_2023, run_distance_2023/1000/run_count_2023, pace[0],pace[1]);
 
             pace = get_pace(run_distance_2024, run_time_2024);
-            run_info += String.format("2024跑步距离 %.2f km, 共跑步 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km\n\n",
+            run_info += String.format("2024运动距离 %.2f km, 共 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km\n\n",
                     run_distance_2024/1000, run_count_2024, run_distance_2024/1000/run_count_2024, pace[0],pace[1]);
 
             run_info += String.format("-------------------------------------------------------\n\n");
             pace = get_pace(run_distance, run_time);
-            run_info += String.format("总跑步距离 %.2f km, 共跑步 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km\n\n",
+            run_info += String.format("总运动距离 %.2f km, 共 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km\n\n",
                     run_distance/1000, run_count, run_distance/1000/run_count, pace[0],pace[1]);
             run_info += String.format("-------------------------------------------------------\n\n");
             run_info += String.format("Note:\n");
             run_info += String.format(" - 按农历年份统计\n");
-            run_info += String.format(" - 忽略配速大于10min的散步式跑步\n");
+            run_info += String.format(" - 运动是指跑步+行走\n");
+            run_info += String.format(" - 忽略配速慢且距离短的运动\n");
             Log.i("visdebug", run_info);
 
             // 关闭游标
