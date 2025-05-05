@@ -5,7 +5,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -16,6 +15,12 @@ import android.util.Log;
 import android.widget.TextView;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
 
 public class MainActivity extends AppCompatActivity {
     public static Context context;
@@ -54,104 +59,111 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // 读取表中的字段
-        String[] columns = {"_id", "start_time", "distance", "time", "type"};
+        String[] columns = {"_id", "start_time", "distance", "time", "type", "deleted"};
         Cursor cursor = db.query("activity", columns, null, null, null, null, null);
-
-        String run_info = "";
-        // 遍历结果集并打印字段值
-        if (cursor != null) {
-            int run_count = 0;
-            long run_time = 0;  // sec
-            float run_distance = 0;
-
-            // 农历年份
-            long start_2023 = 1674144000;
-            long end_2023 = 1707494400;
-            long end_2024 = 1740758400;
-
-            int run_count_2023 = 0;
-            long run_time_2023 = 0;  // sec
-            float run_distance_2023 = 0;
-
-            int run_count_2024 = 0;
-            long run_time_2024 = 0;  // sec
-            float run_distance_2024 = 0;
-
-            while (cursor.moveToNext()) {
-                int id = cursor.getInt(cursor.getColumnIndexOrThrow("_id"));
-                long startTime = cursor.getLong(cursor.getColumnIndexOrThrow("start_time"));
-                float distance = cursor.getFloat(cursor.getColumnIndexOrThrow("distance"));
-                long time = cursor.getLong(cursor.getColumnIndexOrThrow("time"));
-                // type: 0跑步 4行走
-                int type = cursor.getInt(cursor.getColumnIndexOrThrow("type"));
-
-                do {
-                    // 统计跑步
-                    if (type == 0 || type == 4) {
-                        long[] pace = get_pace(distance, time);
-
-                        // 忽略配速太慢 && 距离太短的
-                        if (type == 0 && pace[0] > 11 && distance < 2000) {
-                            break;
-                        } else if (type == 4 && pace[0] > 15 && distance < 3000) {
-                            break;
-                        }
-
-                        // 全部
-                        run_count++;
-                        run_time += time;
-                        run_distance += distance;
-
-                        // 2023
-                        if (startTime >= start_2023) {
-                            if (startTime < end_2023) {
-                                run_count_2023++;
-                                run_time_2023 += time;
-                                run_distance_2023 += distance;
-                            } else if (startTime < end_2024) {
-                                run_count_2024++;
-                                run_time_2024 += time;
-                                run_distance_2024 += distance;
-                            }
-                        }
-                    }
-                } while (false);
-
-                //Log.i("visdebug", "id: " + id + ", start_time: " + startTime + ", distance: " + distance +
-                //        ", time: " + time + ", type: " + type);
-            }
-
-            // 这里把跑步和行走合并计算配速，也许不好
-            long[] pace = get_pace(run_distance_2023, run_time_2023);
-            run_info += String.format("2023运动距离 %.2f km, 共 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km\n\n",
-                    run_distance_2023/1000, run_count_2023, run_distance_2023/1000/run_count_2023, pace[0],pace[1]);
-
-            pace = get_pace(run_distance_2024, run_time_2024);
-            run_info += String.format("2024运动距离 %.2f km, 共 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km\n\n",
-                    run_distance_2024/1000, run_count_2024, run_distance_2024/1000/run_count_2024, pace[0],pace[1]);
-
-            run_info += String.format("-------------------------------------------------------\n\n");
-            pace = get_pace(run_distance, run_time);
-            run_info += String.format("总运动距离 %.2f km, 共 %d 次\n平均每次 %.2f km, 配速 %d:%02d /km\n\n",
-                    run_distance/1000, run_count, run_distance/1000/run_count, pace[0],pace[1]);
-            run_info += String.format("-------------------------------------------------------\n\n");
-            run_info += String.format("Note:\n");
-            run_info += String.format(" - 按农历年份统计\n");
-            run_info += String.format(" - 运动是指跑步+行走\n");
-            run_info += String.format(" - 忽略配速慢且距离短的运动\n");
-            Log.i("visdebug", run_info);
-
-            // 关闭游标
-            cursor.close();
+        if (cursor == null) {
+            return ;
         }
 
-        // 关闭数据库连接
-        db.close();
+        // 遍历结果集并打印字段值
+        int run_count = 0;
+        long run_time = 0;  // sec
+        float run_distance = 0;
 
-        // 显示信息
-        runinfo.setText(run_info);
-/*
- */
+        int run_count_2023 = 0;
+        long run_time_2023 = 0;  // sec
+        float run_distance_2023 = 0;
+
+        int run_count_2024 = 0;
+        long run_time_2024 = 0;  // sec
+        float run_distance_2024 = 0;
+
+        // 0跑步, 1骑行, 2其他, 3越野, 4行走
+        final String[] ACTIVITY_TYPE_NAMES = {"跑步", "骑行", "其他", "越野", "行走"};
+
+        //  key: year, value map:
+        //      key: activity type, value: YearData
+        Map<Integer, Map<Integer, YearData>> allActivityData = new HashMap<>();
+        while (cursor.moveToNext()) {
+            // 从表中读取数据
+            int id = cursor.getInt(cursor.getColumnIndexOrThrow("_id"));
+            long startTime = cursor.getLong(cursor.getColumnIndexOrThrow("start_time"));
+            float distance = cursor.getFloat(cursor.getColumnIndexOrThrow("distance"));
+            long duration = cursor.getLong(cursor.getColumnIndexOrThrow("time"));
+            // type: see ACTIVITY_TYPE_NAMES
+            int type = cursor.getInt(cursor.getColumnIndexOrThrow("type"));
+            int deleted = cursor.getInt(cursor.getColumnIndexOrThrow("deleted"));
+
+            // 忽略删除的运动 or 其他未知类型的运动
+            if (deleted == 1 || type == 2 || (type < 0 || type > 4)) {
+                continue;
+            }
+
+            // 忽略配速太慢 && 距离太短的
+            long[] pace = get_pace(distance, duration);
+            if (type == 0 && pace[0] > 11 && distance < 2000) {  // 跑步
+                continue;
+            } else if (type == 4 && pace[0] > 15 && distance < 3000) {  // 行走
+                continue;
+            }
+
+            Integer activity_year = getYearFromTimestamp(startTime);
+
+            // if this year not contained in data, add it
+            if (!allActivityData.containsKey(activity_year)) {
+                allActivityData.put(activity_year, new HashMap<>());
+                allActivityData.get(activity_year).put(type, new YearData());
+            } else if (allActivityData.containsKey(activity_year) &&
+                        !allActivityData.get(activity_year).containsKey(type))
+            {
+                allActivityData.get(activity_year).put(type, new YearData());
+            }
+
+            // add record to data of the year
+            allActivityData.get(activity_year).get(type)
+                .addRecord(startTime, duration, distance, pace);
+
+            //Log.i("visdebug", "id: " + id + ", start_time: " + startTime + ", distance: " + distance +
+            //        ", time: " + time + ", type: " + type);
+        }
+
+        String run_info = "";
+        // loop allActivityData
+        for (Map.Entry<Integer, Map<Integer, YearData>> entry : allActivityData.entrySet()) {
+            run_info += entry.getKey() + " 年:\n";
+
+            int count = 0;
+            float total_distance = 0;  // km
+            float total_duration = 0;  // min
+            for (Map.Entry<Integer, YearData> entry2 : entry.getValue().entrySet()) {
+                String type_name = ACTIVITY_TYPE_NAMES[entry2.getKey()];
+                YearData year_data = entry2.getValue();
+                String year_summary = year_data.toString();
+                run_info += "  - " + type_name + " " + year_summary + "\n";
+
+                count += year_data.count;
+                total_distance += year_data.total_distance / 1000;
+                total_duration += year_data.total_duration / 60.f;
+            }
+            if (count > 0) {
+                if (total_duration < 60)
+                    run_info += String.format("  - 共运动: %d 次, %.2f km, %.2f min", count, total_distance, total_duration);
+                else {
+                    total_duration /= 60.0f;   // h
+                    run_info += String.format("  - 共运动: %d 次, %.2f km, %.2f h", count, total_distance, total_duration);
+                }
+            }
+            run_info += "\n";
+        }
+
+        run_info += String.format("----------------------------------------------------------------\n\n");
+        run_info += String.format("Note:\n");
+        run_info += String.format(" - 忽略配速慢且距离短的运动\n");
+        Log.i("visdebug", run_info);
+
+        cursor.close();  // 关闭游标
+        db.close();      // 关闭数据库连接
+        runinfo.setText(run_info);   // 显示信息
     }
 
     /**
@@ -169,6 +181,22 @@ public class MainActivity extends AppCompatActivity {
 
         return values;
     }
+
+    /**
+     * 获取时间戳所属的年份
+     * @param timestamp，秒级时间戳
+     * @return 年份，如2022
+     */
+    public int getYearFromTimestamp(long timestamp) {
+        Calendar calendar = Calendar.getInstance();
+        // Set the time zone to UTC if your timestamp is in UTC
+//        calendar.setTimeZone(TimeZone.getTimeZone("UTC"));
+        calendar.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai"));
+        // Convert seconds to milliseconds since Calendar expects milliseconds
+        calendar.setTimeInMillis(timestamp * 1000);
+        return calendar.get(Calendar.YEAR);
+    }
+
     // 请求应用内存读写权限
     public void requestReadWritePermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
