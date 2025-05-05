@@ -101,9 +101,9 @@ public class MainActivity extends AppCompatActivity {
 
             // 忽略配速太慢 && 距离太短的
             long[] pace = get_pace(distance, duration);
-            if (type == 0 && pace[0] > 11 && distance < 2000) {  // 跑步
+            if ((type == 0 || type == 1) && pace[0] > 11 && distance < 2000) {  // 跑步 || 骑行
                 continue;
-            } else if (type == 4 && pace[0] > 15 && distance < 3000) {  // 行走
+            } else if ((type == 3 || type == 4) && pace[0] > 15 && distance < 3000) {  // 行走
                 continue;
             }
 
@@ -139,7 +139,11 @@ public class MainActivity extends AppCompatActivity {
                 String type_name = ACTIVITY_TYPE_NAMES[entry2.getKey()];
                 YearData year_data = entry2.getValue();
                 String year_summary = year_data.toString();
-                run_info += "  - " + type_name + " " + year_summary + "\n";
+                run_info += "  - " + type_name + " " + year_summary;
+                // TODO 添加配速
+                long[] pace = get_pace(year_data.total_distance, year_data.total_duration);
+                run_info += String.format(", %d'%02d''\n", pace[0], pace[1]);
+
 
                 count += year_data.count;
                 total_distance += year_data.total_distance / 1000;
